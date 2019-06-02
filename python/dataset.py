@@ -12,9 +12,13 @@ def read_csv(filename):
       data = [data for data in it]
   return data[1:] # Skip the first line
 
-train_data = read_csv("dataset/train.csv")
-test_data = read_csv("dataset/test.csv")
+def load_data():
+  train_data = read_csv("dataset/train.csv")
+  test_data = [],
+  #test_data = read_csv("dataset/test.csv")
+  return train_data, None
 
+"""
 punctuation_table = str.maketrans('', '', string.punctuation)
 # https://www.kaggle.com/currie32/the-importance-of-cleaning-text
 # NLTK seems to have too many, esp the negation ones are essential.
@@ -75,4 +79,5 @@ for row in train_data:
 #np.save("dataset/test.npy", test_data)
 #train_data = np.load("dataset/train.npy")
 #test_data = np.load("dataset/test.npy")
+"""
 

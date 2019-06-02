@@ -1,8 +1,9 @@
 dataset
-ml/__pycache__
+model
+python/__pycache__
 plot.png
 .DS_Store
 charts
 checkpoints
 images
-npydata*
+npydata
