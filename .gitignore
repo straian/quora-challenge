@@ -1,5 +1,6 @@
 dataset
 model
+logs
 python/__pycache__
 plot.png
 .DS_Store

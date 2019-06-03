@@ -6,19 +6,6 @@ import nltk
 from nltk.stem import SnowballStemmer
 import string
 
-def read_csv(filename):
-  with open(filename, 'r') as f:
-      it = csv.reader(f, delimiter = ',', quotechar = '"')
-      data = [data for data in it]
-  return data[1:] # Skip the first line
-
-def load_data():
-  train_data = read_csv("dataset/train.csv")
-  test_data = [],
-  #test_data = read_csv("dataset/test.csv")
-  return train_data, None
-
-"""
 punctuation_table = str.maketrans('', '', string.punctuation)
 # https://www.kaggle.com/currie32/the-importance-of-cleaning-text
 # NLTK seems to have too many, esp the negation ones are essential.
@@ -65,12 +52,23 @@ def clean_text(text):
   # filter out stop words
   words = [w for w in words if not w in stop_words]
   # stem
-  stemmed = [stemmer.stem(word) for word in words]
-  return stemmed
+  #stemmed = [stemmer.stem(word) for word in words]
+  return " ".join(words)
 
-for row in train_data:
-  row[3] = clean_text(row[3])
-  row[4] = clean_text(row[4])
+def read_csv(filename, is_test):
+  with open(filename, 'r') as f:
+      it = csv.reader(f, delimiter = ',', quotechar = '"')
+      if is_test:
+        data = [[data[1], data[2], data[3]] for data in it]
+      else:
+        data = [[data[3], data[4], data[5]] for data in it]
+  return data[1:] # Skip the first line
+
+def load_data():
+  train_data = read_csv("dataset/train.csv", False)
+  test_data = [],
+  #test_data = read_csv("dataset/test.csv", True)
+  return train_data, None
 
 # https://www.dlology.com/blog/keras-meets-universal-sentence-encoder-transfer-learning-for-text-data/
 
@@ -79,5 +77,4 @@ for row in train_data:
 #np.save("dataset/test.npy", test_data)
 #train_data = np.load("dataset/train.npy")
 #test_data = np.load("dataset/test.npy")
-"""
 

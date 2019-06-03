@@ -13,6 +13,7 @@ RUN pip install nltk
 RUN python -m nltk.downloader all
 RUN pip install tensorflow-hub
 RUN pip install keras-bert
+RUN pip install tensorboard
 
 COPY python python
 

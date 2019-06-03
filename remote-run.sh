@@ -26,15 +26,19 @@ $HOST_ADDR && exit 1
 # Serialized numpy inputs
 #scp -i $SSH_KEY npydata straian@$HOST_ADDR:.
 
+rm -fr logs/logs-$HOST_ADDR-old
 rm -fr charts/charts-$HOST_ADDR-old
 rm -fr checkpoints/checkpoints-$HOST_ADDR-old
+cp -r logs/logs-$HOST_ADDR logs/logs-$HOST_ADDR-old
 cp -r charts/charts-$HOST_ADDR charts/charts-$HOST_ADDR-old
 cp -r checkpoints/checkpoints-$HOST_ADDR checkpoints/checkpoints-$HOST_ADDR-old
+rm -fr logs/logs-$HOST_ADDR
 rm -fr charts/charts-$HOST_ADDR
 rm -fr checkpoints/checkpoints-$HOST_ADDR
 
 scp -i $SSH_KEY docker-run.sh straian@$HOST_ADDR:.
 ssh -i $SSH_KEY straian@$HOST_ADDR bash docker-run.sh
+scp -r -i $SSH_KEY straian@$HOST_ADDR:logs logs/logs-$HOST_ADDR
 scp -r -i $SSH_KEY straian@$HOST_ADDR:charts charts/charts-$HOST_ADDR
 scp -r -i $SSH_KEY straian@$HOST_ADDR:checkpoints checkpoints/checkpoints-$HOST_ADDR
 open charts-$HOST_ADDR/*.png
