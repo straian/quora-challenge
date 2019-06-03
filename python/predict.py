@@ -1,6 +1,7 @@
 from __future__ import absolute_import, division, print_function
 
 import tensorflow as tf
+import math
 import keras
 from tensorflow.keras.models import load_model
 from keras_bert import load_trained_model_from_checkpoint
@@ -27,37 +28,55 @@ CONFIG_PATH = MODEL_DIR + "bert_config.json"
 CHECKPOINT_PATH = MODEL_DIR + "bert_model.ckpt"
 LOG_PATH = "logs" if GPUS else "logs/logs-local"
 
-MODEL_GPU_NAME = "weights.05-0.586.hdf5"
-MODEL_LOCAL_NAME = "weights.00-1.000-1.000.hdf5"
+DENSE_MODEL_NAME = "top-model-dense.00-0.894-0.729.hdf5"
 
-model = None
-if GPUS:
-  # https://github.com/CyberZHG/keras-bert/issues/66
-  model = keras.models.load_model("model/top_model/" + MODEL_GPU_NAME, custom_objects=get_custom_objects())
-else:
-  top_model = keras.models.load_model("model/top_model/" + MODEL_LOCAL_NAME)
-  top_model.output_shape
-  top_model.summary()
+bert_model = load_trained_model_from_checkpoint(CONFIG_PATH, CHECKPOINT_PATH)
+bert_model.summary()
+bert_output_shape = bert_model.output.shape.as_list()
+num_bert_outputs = bert_output_shape[1] * bert_output_shape[2]
 
-  bert_model = load_trained_model_from_checkpoint(CONFIG_PATH, CHECKPOINT_PATH)
-  bert_model.summary()
-  bert_output_shape = bert_model.output.shape.as_list()
-  num_bert_outputs = bert_output_shape[1] * bert_output_shape[2]
+top_model_flatten = keras.Sequential([
+  # Need lambda because flatten does not support masking
+  # https://github.com/keras-team/keras/issues/4978#issuecomment-303985365
+  keras.layers.Lambda(lambda x: x, output_shape=lambda s:s, input_shape=bert_output_shape[1:]),
+  keras.layers.Flatten(),
+])
+top_model_flatten.output_shape
+top_model_flatten.summary()
 
-  model = keras.models.Model(inputs=bert_model.input, outputs=top_model(bert_model.output))
+top_model_dense = keras.models.load_model("model/top_model/" + DENSE_MODEL_NAME)
+top_model_dense.output_shape
+top_model_dense.summary()
+
+top_model = keras.models.Model(inputs=top_model_flatten.input, outputs=top_model_dense(top_model_flatten.output))
+top_model.output_shape
+top_model.summary()
+
+model = keras.models.Model(inputs=bert_model.input, outputs=top_model(bert_model.output))
 model.summary()
 
-TEST_SAMPLES = 2345796
-#TEST_SAMPLES = 32
+#TEST_SAMPLES = 2345796
+TEST_SAMPLES = 32
 
-test_indices, test_segments = dataset.load_test_data(TEST_SAMPLES)
+# Only predict one out of each DOWN_SAMPLE_RATE sample.
+#DOWN_SAMPLE_RATE = 1000
+DOWN_SAMPLE_RATE = 1
+
+test_indices0, test_segments0 = dataset.load_test_data(TEST_SAMPLES)
+i = 0
+test_indices = []
+test_segments = []
+for i in range(int(math.floor(TEST_SAMPLES / DOWN_SAMPLE_RATE))):
+  test_indices.append(test_indices0[i * DOWN_SAMPLE_RATE])
+  test_segments.append(test_segments0[i * DOWN_SAMPLE_RATE])
+  i += DOWN_SAMPLE_RATE
 
 print("Starting prediction: ", len(test_indices))
-outputs = model.predict([test_indices, test_segments])
+outputs = model.predict([test_indices, test_segments], verbose=1)
 print("Ended prediction: ", len(outputs))
-lines = [[i, int(round(outputs[i][0]))] for i in range(len(outputs))]
+lines = [[i * DOWN_SAMPLE_RATE, int(round(outputs[i][0]))] for i in range(len(outputs))]
 
-with open('outputs/submittable-{}.csv'.format(TEST_SAMPLES), 'w') as write_file:
+with open('outputs/submittable-{}-{}.csv'.format(TEST_SAMPLES, DOWN_SAMPLE_RATE), 'w') as write_file:
   writer = csv.writer(write_file)
   writer.writerow(["test_id" , "is_duplicate"])
   writer.writerows(lines)

@@ -22,10 +22,10 @@ GPUS = get_available_gpus()
 print("GPU count: ", GPUS)
 
 BATCH_SIZE = (32 * GPUS) if GPUS else 4
-EPOCHS = 10
+EPOCHS = 5
 
-#TRAIN_SAMPLES = 40960 if GPUS else 16
-#VAL_SAMPLES = 5120 if GPUS else 8
+#TRAIN_SAMPLES = 4096 if GPUS else 4
+#VAL_SAMPLES = 512 if GPUS else 4
 TRAIN_SAMPLES = 380000 if GPUS else 20
 VAL_SAMPLES = 20000 if GPUS else 10
 
@@ -34,22 +34,31 @@ CONFIG_PATH = MODEL_DIR + "bert_config.json"
 CHECKPOINT_PATH = MODEL_DIR + "bert_model.ckpt"
 LOG_PATH = "logs" if GPUS else "logs/logs-local"
 
-top_model = None
 def prepare_model():
-  global top_model
   bert_model = load_trained_model_from_checkpoint(CONFIG_PATH, CHECKPOINT_PATH)
   bert_model.summary()
   bert_output_shape = bert_model.output.shape.as_list()
   num_bert_outputs = bert_output_shape[1] * bert_output_shape[2]
-  top_model = keras.Sequential([
+
+  top_model_flatten = keras.Sequential([
+    # Need lambda because flatten does not support masking
     # https://github.com/keras-team/keras/issues/4978#issuecomment-303985365
     keras.layers.Lambda(lambda x: x, output_shape=lambda s:s, input_shape=bert_output_shape[1:]),
     keras.layers.Flatten(),
-    #keras.layers.Dense(256, activation='relu', input_shape=bert_output_shape[1:]),
-    keras.layers.Dense(1, activation='sigmoid')
   ])
+  top_model_flatten.output_shape
+  top_model_flatten.summary()
+
+  top_model_dense = keras.Sequential([
+    keras.layers.Dense(1, activation='sigmoid', input_shape=(num_bert_outputs,))
+  ])
+  top_model_dense.output_shape
+  top_model_dense.summary()
+
+  top_model = keras.models.Model(inputs=top_model_flatten.input, outputs=top_model_dense(top_model_flatten.output))
   top_model.output_shape
   top_model.summary()
+
   # https://github.com/keras-team/keras/issues/3465#issuecomment-314633196
   model = keras.models.Model(inputs=bert_model.input, outputs=top_model(bert_model.output))
   # Default learning rate is 0.001. Decrease it to prevent vanishing gratient (predictions all go to 0) because of sigmoid loss.
@@ -58,25 +67,20 @@ def prepare_model():
   optimizer = keras.optimizers.Adam(lr=0.0003)
 
   model.compile(
-      #loss='categorical_crossentropy',
       loss='binary_crossentropy',
       optimizer=optimizer,
       metrics=['accuracy'])
   model.summary()
-  return model
-
-def len_input(segment):
-  li = segment.tolist()
-  # https://stackoverflow.com/questions/6890170/how-to-find-the-last-occurrence-of-an-item-in-a-python-list
-  return len(li) - li[::-1].index(1)
-#lens = [len_input(s) for s in train_segments]
+  return model, top_model_dense
 
 train_indices, train_segments, train_results, val_indices, val_segments, val_results = dataset.load_train_data(TRAIN_SAMPLES, VAL_SAMPLES)
 
-model = prepare_model()
+# 'model' is used to train. 'top_model_dense' is only used for checkpointing.
+model, top_model_dense = prepare_model()
 
 tensorboard = TensorBoard(log_dir=LOG_PATH+"/{}".format(time()))
 
+# Prints some predicted vs actual results, called after each epoch.
 def run_validation(epoch, logs):
   MAX_PRINT = 100
   global model
@@ -87,6 +91,16 @@ def run_validation(epoch, logs):
 val_cb = keras.callbacks.LambdaCallback(
     on_epoch_end=lambda epoch, logs: run_validation(epoch, logs))
 
+# Checkpoints top dense layer, called after each epoch.
+def checkpoint_top_model_dense(epoch, logs):
+  val_loss = logs["val_loss"]
+  val_acc = logs["val_acc"]
+  global top_model_dense
+  keras.models.save_model(
+      top_model_dense,
+      "checkpoints/top-model-dense.{epoch:02d}-{val_loss:.3f}-{val_acc:.3f}.hdf5".format(epoch=epoch, val_loss=val_loss, val_acc=val_acc))
+checkpoint_cb_small = keras.callbacks.LambdaCallback(
+    on_epoch_end=lambda epoch, logs: checkpoint_top_model_dense(epoch, logs))
 checkpoint_cb = keras.callbacks.ModelCheckpoint("checkpoints/weights.{epoch:02d}-{val_loss:.3f}.hdf5", save_best_only=True)
 
 run_validation(None, None)
@@ -95,5 +109,5 @@ history = model.fit(
     [train_indices, train_segments], train_results,
     validation_data=([val_indices, val_segments], val_results),
     epochs=EPOCHS, batch_size=BATCH_SIZE,
-    callbacks=[checkpoint_cb, val_cb, tensorboard])
+    callbacks=[checkpoint_cb_small, checkpoint_cb, val_cb, tensorboard])
 

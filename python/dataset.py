@@ -6,7 +6,6 @@ import codecs
 import re
 import string
 import nltk
-from nltk.stem import SnowballStemmer
 from keras_bert import Tokenizer
 
 """
@@ -16,7 +15,6 @@ Methods for input preprocessing, before it is ready to be fed into BERT.
 punctuation_table = str.maketrans('', '', string.punctuation)
 # https://www.kaggle.com/currie32/the-importance-of-cleaning-text
 # NLTK seems to have too many, esp the negation ones are essential.
-# TODO: Some words may be critical to understanding the sentence -- may remove a few when looking at bad estimations.
 stop_words = [
     "a", "i",
     "an", "as", "by", "at", "if", "in", "is", "of", "on", "so", "to",
@@ -25,7 +23,6 @@ stop_words = [
     "what", "which", "while", "who",
     "because", "through", "during", "just", "about",
 ]
-stemmer = SnowballStemmer('english')
 
 def clean_text(text):
   text = text.lower()
