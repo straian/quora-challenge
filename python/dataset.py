@@ -1,10 +1,17 @@
 import numpy as np
 import csv
 
+import os
+import codecs
 import re
+import string
 import nltk
 from nltk.stem import SnowballStemmer
-import string
+from keras_bert import Tokenizer
+
+"""
+Methods for input preprocessing, before it is ready to be fed into BERT.
+"""
 
 punctuation_table = str.maketrans('', '', string.punctuation)
 # https://www.kaggle.com/currie32/the-importance-of-cleaning-text
@@ -59,22 +66,82 @@ def read_csv(filename, is_test):
   with open(filename, 'r') as f:
       it = csv.reader(f, delimiter = ',', quotechar = '"')
       if is_test:
-        data = [[data[1], data[2], data[3]] for data in it]
+        data = [[data[1], data[2]] for data in it]
       else:
         data = [[data[3], data[4], data[5]] for data in it]
   return data[1:] # Skip the first line
 
-def load_data():
-  train_data = read_csv("dataset/train.csv", False)
-  test_data = [],
-  #test_data = read_csv("dataset/test.csv", True)
-  return train_data, None
+MODEL_DIR = "model/uncased_L-12_H-768_A-12/"
+DICT_PATH = MODEL_DIR + "vocab.txt"
 
-# https://www.dlology.com/blog/keras-meets-universal-sentence-encoder-transfer-learning-for-text-data/
+def prepare_data(data, is_test):
+  token_dict = {}
+  with codecs.open(DICT_PATH, 'r', 'utf8') as reader:
+      for line in reader:
+          token = line.strip()
+          token_dict[token] = len(token_dict)
+  tokenizer = Tokenizer(token_dict)
+  indices = []
+  segments = []
+  results = []
+  i = 0
+  for row in data:
+    text1 = clean_text(row[0])
+    text2 = clean_text(row[1])
+    # In training set, max len is 201. Idk yet what max token count is in test set.
+    # Still, pretrained BERT has width of 512, so that's what we will use.
+    row_indices, row_segments = tokenizer.encode(first=text1, second=text2, max_len=512)
+    indices.append(row_indices)
+    segments.append(row_segments)
+    #print(tokenizer.tokenize(text1))
+    #print(tokenizer.tokenize(text2))
+    #print(row_indices)
+    #print(row_segments)
+    if not is_test:
+      results.append(row[2])
+    if i % 100 is 0:
+      print("i=", i)
+    i += 1
+  print("Num rows processed: ", i)
+  if is_test:
+    return np.array(indices), np.array(segments)
+  else:
+    return np.array(indices), np.array(segments), np.array(results, dtype="float32")
 
+def load_test_data(test_samples):
+  if (not os.path.isfile('npydata/test_indices-{}.npy'.format(test_samples)) or
+      not os.path.isfile('npydata/test_segments-{}.npy'.format(test_samples))):
+    input_data = read_csv("dataset/test.csv", True)
+    test_indices, test_segments = prepare_data(input_data[:test_samples], True)
+    np.save("npydata/test_indices-{}.npy".format(test_samples), test_indices)
+    np.save("npydata/test_segments-{}.npy".format(test_samples), test_segments)
+  test_indices = np.load("npydata/test_indices-{}.npy".format(test_samples))
+  test_segments = np.load("npydata/test_segments-{}.npy".format(test_samples))
+  return test_indices, test_segments
 
-#np.save("dataset/train.npy", train_data)
-#np.save("dataset/test.npy", test_data)
-#train_data = np.load("dataset/train.npy")
-#test_data = np.load("dataset/test.npy")
+def load_train_data(train_samples, val_samples):
+  train_samples = min(train_samples, 380000)
+  val_samples = min(val_samples, 20000)
+  if (not os.path.isfile('npydata/train_indices-{}.npy'.format(train_samples)) or
+      not os.path.isfile('npydata/train_segments-{}.npy'.format(train_samples)) or
+      not os.path.isfile('npydata/train_results-{}.npy'.format(train_samples)) or
+      not os.path.isfile('npydata/val_indices-{}.npy'.format(val_samples)) or
+      not os.path.isfile('npydata/val_segments-{}.npy'.format(val_samples)) or
+      not os.path.isfile('npydata/val_results-{}.npy'.format(val_samples))):
+    input_data = read_csv("dataset/train.csv", False)
+    train_indices, train_segments, train_results = prepare_data(input_data[:train_samples], False)
+    val_indices, val_segments, val_results = prepare_data(input_data[-val_samples:], False)
+    np.save("npydata/train_indices-{}.npy".format(train_samples), train_indices)
+    np.save("npydata/train_segments-{}.npy".format(train_samples), train_segments)
+    np.save("npydata/train_results-{}.npy".format(train_samples), train_results)
+    np.save("npydata/val_indices-{}.npy".format(val_samples), val_indices)
+    np.save("npydata/val_segments-{}.npy".format(val_samples), val_segments)
+    np.save("npydata/val_results-{}.npy".format(val_samples), val_results)
+  train_indices = np.load("npydata/train_indices-{}.npy".format(train_samples))
+  train_segments = np.load("npydata/train_segments-{}.npy".format(train_samples))
+  train_results = np.load("npydata/train_results-{}.npy".format(train_samples))
+  val_indices = np.load("npydata/val_indices-{}.npy".format(val_samples))
+  val_segments = np.load("npydata/val_segments-{}.npy".format(val_samples))
+  val_results = np.load("npydata/val_results-{}.npy".format(val_samples))
+  return train_indices, train_segments, train_results, val_indices, val_segments, val_results
 

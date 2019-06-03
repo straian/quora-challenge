@@ -19,7 +19,8 @@ docker run --runtime=nvidia -dit --name=$CONTAINER_NAME \
     -v `pwd`/checkpoints:/checkpoints \
     straian/quora-challenge bash
 
-docker exec -t $CONTAINER_NAME python python/bert.py
+#docker exec -t $CONTAINER_NAME python python/train.py
+docker exec -t $CONTAINER_NAME python python/predict.py
 
 # Delete all but last
 cd checkpoints; rm -f `ls|sort -r|awk 'NR>1'`; cd -

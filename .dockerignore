@@ -1,4 +1,5 @@
 dataset
+outputs
 model
 logs
 python/__pycache__
