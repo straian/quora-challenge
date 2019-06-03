@@ -47,6 +47,7 @@ def clean_text(text):
   text = re.sub(r" i.e.", " ie ", text)
   text = re.sub(r" e g ", " eg ", text)
   text = re.sub(r" e.g.", " eg ", text)
+
   # https://machinelearningmastery.com/clean-text-machine-learning-python/
   tokens = nltk.word_tokenize(text)
   # remove punctuation from each word
@@ -59,13 +60,19 @@ def clean_text(text):
   #stemmed = [stemmer.stem(word) for word in words]
   return " ".join(words)
 
-def read_csv(filename, is_test):
+def read_csv(filename, count, is_test):
   with open(filename, 'r') as f:
       it = csv.reader(f, delimiter = ',', quotechar = '"')
-      if is_test:
-        data = [[data[1], data[2]] for data in it]
-      else:
-        data = [[data[3], data[4], data[5]] for data in it]
+      i = 0
+      data = []
+      for row in it:
+        if is_test:
+          data.append([row[1], row[2]])
+        else:
+          data.append([row[3], row[4], row[5]])
+        if i == count + 1:
+          break
+        i += 1
   return data[1:] # Skip the first line
 
 MODEL_DIR = "model/uncased_L-12_H-768_A-12/"
@@ -108,10 +115,11 @@ def prepare_data(data, is_test):
 def load_test_data(test_samples):
   if (not os.path.isfile('npydata/test_indices-{}.npy'.format(test_samples)) or
       not os.path.isfile('npydata/test_segments-{}.npy'.format(test_samples))):
-    input_data = read_csv("dataset/test.csv", True)
+    input_data = read_csv("dataset/test.csv", test_samples, True)
     test_indices, test_segments = prepare_data(input_data[:test_samples], True)
     np.save("npydata/test_indices-{}.npy".format(test_samples), test_indices)
     np.save("npydata/test_segments-{}.npy".format(test_samples), test_segments)
+
   test_indices = np.load("npydata/test_indices-{}.npy".format(test_samples))
   test_segments = np.load("npydata/test_segments-{}.npy".format(test_samples))
   return test_indices, test_segments
@@ -125,7 +133,7 @@ def load_train_data(train_samples, val_samples):
       not os.path.isfile('npydata/val_indices-{}.npy'.format(val_samples)) or
       not os.path.isfile('npydata/val_segments-{}.npy'.format(val_samples)) or
       not os.path.isfile('npydata/val_results-{}.npy'.format(val_samples))):
-    input_data = read_csv("dataset/train.csv", False)
+    input_data = read_csv("dataset/train.csv", train_samples + val_samples, False)
     train_indices, train_segments, train_results = prepare_data(input_data[:train_samples], False)
     val_indices, val_segments, val_results = prepare_data(input_data[-val_samples:], False)
     np.save("npydata/train_indices-{}.npy".format(train_samples), train_indices)
@@ -134,6 +142,7 @@ def load_train_data(train_samples, val_samples):
     np.save("npydata/val_indices-{}.npy".format(val_samples), val_indices)
     np.save("npydata/val_segments-{}.npy".format(val_samples), val_segments)
     np.save("npydata/val_results-{}.npy".format(val_samples), val_results)
+
   train_indices = np.load("npydata/train_indices-{}.npy".format(train_samples))
   train_segments = np.load("npydata/train_segments-{}.npy".format(train_samples))
   train_results = np.load("npydata/train_results-{}.npy".format(train_samples))

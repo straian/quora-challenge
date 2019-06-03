@@ -30,6 +30,7 @@ LOG_PATH = "logs" if GPUS else "logs/logs-local"
 
 DENSE_MODEL_NAME = "top-model-dense.00-0.894-0.729.hdf5"
 
+print("Preparing model...")
 bert_model = load_trained_model_from_checkpoint(CONFIG_PATH, CHECKPOINT_PATH)
 bert_model.summary()
 bert_output_shape = bert_model.output.shape.as_list()
@@ -54,6 +55,7 @@ top_model.summary()
 
 model = keras.models.Model(inputs=bert_model.input, outputs=top_model(bert_model.output))
 model.summary()
+print("Prepared model")
 
 #TEST_SAMPLES = 2345796
 TEST_SAMPLES = 32
@@ -62,6 +64,7 @@ TEST_SAMPLES = 32
 #DOWN_SAMPLE_RATE = 1000
 DOWN_SAMPLE_RATE = 1
 
+print("Loading data...")
 test_indices0, test_segments0 = dataset.load_test_data(TEST_SAMPLES)
 i = 0
 test_indices = []
@@ -70,6 +73,7 @@ for i in range(int(math.floor(TEST_SAMPLES / DOWN_SAMPLE_RATE))):
   test_indices.append(test_indices0[i * DOWN_SAMPLE_RATE])
   test_segments.append(test_segments0[i * DOWN_SAMPLE_RATE])
   i += DOWN_SAMPLE_RATE
+print("Loaded data")
 
 print("Starting prediction: ", len(test_indices))
 outputs = model.predict([test_indices, test_segments], verbose=1)

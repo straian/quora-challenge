@@ -73,10 +73,14 @@ def prepare_model():
   model.summary()
   return model, top_model_dense
 
-train_indices, train_segments, train_results, val_indices, val_segments, val_results = dataset.load_train_data(TRAIN_SAMPLES, VAL_SAMPLES)
-
+print("Preparing model...")
 # 'model' is used to train. 'top_model_dense' is only used for checkpointing.
 model, top_model_dense = prepare_model()
+print("prepared model")
+
+print("Loading data...")
+train_indices, train_segments, train_results, val_indices, val_segments, val_results = dataset.load_train_data(TRAIN_SAMPLES, VAL_SAMPLES)
+print("Loaded data")
 
 tensorboard = TensorBoard(log_dir=LOG_PATH+"/{}".format(time()))
 
